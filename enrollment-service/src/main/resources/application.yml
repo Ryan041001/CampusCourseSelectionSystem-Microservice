@@ -4,6 +4,16 @@ server:
 spring:
   application:
     name: enrollment-service
+  cloud:
+    compatibility-verifier:
+      enabled: false
+    nacos:
+      discovery:
+        server-addr: nacos:8848
+        group: COURSEHUB_GROUP
+        ephemeral: true
+        heart-beat-interval: 5000
+        heart-beat-timeout: 15000
   datasource:
     url: jdbc:mysql://localhost:3306/enrollment_db?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
     username: root
@@ -17,5 +27,11 @@ spring:
       hibernate:
         dialect: org.hibernate.dialect.MySQLDialect
 
-catalog-service:
-  url: http://localhost:8081
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always

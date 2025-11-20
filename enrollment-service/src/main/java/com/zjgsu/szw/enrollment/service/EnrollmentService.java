@@ -6,7 +6,6 @@ import com.zjgsu.szw.enrollment.model.EnrollmentStatus;
 import com.zjgsu.szw.enrollment.model.Student;
 import com.zjgsu.szw.enrollment.repository.EnrollmentRepository;
 import com.zjgsu.szw.enrollment.repository.StudentRepository;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.HttpClientErrorException;
@@ -27,8 +26,8 @@ public class EnrollmentService {
     private final StudentRepository studentRepository;
     private final RestTemplate restTemplate;
 
-    @Value("${catalog-service.url}")
-    private String catalogServiceUrl;
+    // Use service name instead of hardcoded URL for Nacos service discovery
+    private final String catalogServiceUrl = "http://catalog-service";
 
     public EnrollmentService(EnrollmentRepository enrollmentRepository,
                              StudentRepository studentRepository,

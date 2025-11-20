@@ -4,6 +4,8 @@ import com.zjgsu.szw.catalog.common.ApiResponse;
 import com.zjgsu.szw.catalog.exception.ResourceNotFoundException;
 import com.zjgsu.szw.catalog.model.Course;
 import com.zjgsu.szw.catalog.service.CourseService;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -27,9 +29,9 @@ public class CourseController {
      * GET /api/courses
      */
     @GetMapping
-    public ApiResponse<List<Course>> getAllCourses() {
+    public ResponseEntity<ApiResponse<List<Course>>> getAllCourses() {
         List<Course> courses = courseService.findAll();
-        return ApiResponse.success(courses);
+        return ResponseEntity.ok(ApiResponse.success(courses));
     }
 
     /**
@@ -37,10 +39,10 @@ public class CourseController {
      * GET /api/courses/code/{code}
      */
     @GetMapping("/code/{code}")
-    public ApiResponse<Course> getCourseByCode(@PathVariable String code) {
+    public ResponseEntity<ApiResponse<Course>> getCourseByCode(@PathVariable String code) {
         Course course = courseService.findByCode(code)
                 .orElseThrow(() -> new ResourceNotFoundException("Course not found with code: " + code));
-        return ApiResponse.success(course);
+        return ResponseEntity.ok(ApiResponse.success(course));
     }
 
     /**
@@ -48,10 +50,10 @@ public class CourseController {
      * GET /api/courses/{id}
      */
     @GetMapping("/{id}")
-    public ApiResponse<Course> getCourseById(@PathVariable String id) {
+    public ResponseEntity<ApiResponse<Course>> getCourseById(@PathVariable String id) {
         Course course = courseService.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Course not found with id: " + id));
-        return ApiResponse.success(course);
+        return ResponseEntity.ok(ApiResponse.success(course));
     }
 
     /**
@@ -59,9 +61,10 @@ public class CourseController {
      * POST /api/courses
      */
     @PostMapping
-    public ApiResponse<Course> createCourse(@RequestBody Course course) {
+    public ResponseEntity<ApiResponse<Course>> createCourse(@RequestBody Course course) {
         Course created = courseService.createCourse(course);
-        return ApiResponse.created(created);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.created(created));
     }
 
     /**
@@ -69,11 +72,11 @@ public class CourseController {
      * PUT /api/courses/{id}
      */
     @PutMapping("/{id}")
-    public ApiResponse<Course> updateCourse(
+    public ResponseEntity<ApiResponse<Course>> updateCourse(
             @PathVariable String id,
             @RequestBody Course course) {
         Course updated = courseService.updateCourse(id, course);
-        return ApiResponse.success(updated);
+        return ResponseEntity.ok(ApiResponse.success(updated));
     }
 
     /**
@@ -81,9 +84,9 @@ public class CourseController {
      * DELETE /api/courses/{id}
      */
     @DeleteMapping("/{id}")
-    public ApiResponse<Void> deleteCourse(@PathVariable String id) {
+    public ResponseEntity<ApiResponse<Void>> deleteCourse(@PathVariable String id) {
         courseService.deleteCourse(id);
-        return ApiResponse.success(null);
+        return ResponseEntity.ok(ApiResponse.success(null));
     }
 
     /**
@@ -91,9 +94,9 @@ public class CourseController {
      * POST /api/courses/{id}/increment
      */
     @PostMapping("/{id}/increment")
-    public ApiResponse<Void> incrementEnrolled(@PathVariable String id) {
+    public ResponseEntity<ApiResponse<Void>> incrementEnrolled(@PathVariable String id) {
         courseService.incrementEnrolled(id);
-        return ApiResponse.success(null);
+        return ResponseEntity.ok(ApiResponse.success(null));
     }
 
     /**
@@ -101,8 +104,8 @@ public class CourseController {
      * POST /api/courses/{id}/decrement
      */
     @PostMapping("/{id}/decrement")
-    public ApiResponse<Void> decrementEnrolled(@PathVariable String id) {
+    public ResponseEntity<ApiResponse<Void>> decrementEnrolled(@PathVariable String id) {
         courseService.decrementEnrolled(id);
-        return ApiResponse.success(null);
+        return ResponseEntity.ok(ApiResponse.success(null));
     }
 }

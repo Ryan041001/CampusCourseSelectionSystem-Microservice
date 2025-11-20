@@ -1,4 +1,24 @@
 services:
+  nacos:
+    image: nacos/nacos-server:v3.1.0
+    container_name: nacos
+    environment:
+      MODE: standalone
+      NACOS_AUTH_TOKEN: SecretKey012345678901234567890123456789012345678901234567
+      NACOS_AUTH_IDENTITY_KEY: nacos
+      NACOS_AUTH_IDENTITY_VALUE: nacos
+    ports:
+      - "8848:8848"
+      - "9848:9848"
+    networks:
+      - microservice-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8848/nacos/"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+
   mysql-catalog:
     image: mysql:8.0
     container_name: mysql-catalog
@@ -46,6 +66,8 @@ services:
       DB_USERNAME: root
       DB_PASSWORD: password
     depends_on:
+      nacos:
+        condition: service_healthy
       mysql-catalog:
         condition: service_healthy
     networks:
@@ -61,6 +83,8 @@ services:
       SPRING_DATASOURCE_URL: jdbc:mysql://mysql-enrollment:3306/enrollment_db?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
       CATALOG_SERVICE_URL: http://catalog-service:8081
     depends_on:
+      nacos:
+        condition: service_healthy
       mysql-enrollment:
         condition: service_healthy
       catalog-service:
