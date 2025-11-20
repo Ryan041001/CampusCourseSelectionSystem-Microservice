@@ -10,7 +10,7 @@
 	</parent>
 	<groupId>com.zjgsu.szw</groupId>
 	<artifactId>enrollment-service</artifactId>
-	<version>0.0.1-SNAPSHOT</version>
+	<version>1.0.0</version>
 	<name>enrollment-service</name>
 	<description>Enrollment Service for Campus Course Selection System</description>
 	<url/>
