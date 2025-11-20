@@ -1,0 +1,77 @@
+services:
+  mysql-catalog:
+    image: mysql:8.0
+    container_name: mysql-catalog
+    environment:
+      MYSQL_ROOT_PASSWORD: password
+      MYSQL_DATABASE: catalog_db
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql_catalog_data:/var/lib/mysql
+      - ./mysql/init-catalog.sql:/docker-entrypoint-initdb.d/init-catalog.sql:ro
+    networks:
+      - microservice-network
+    healthcheck:
+      test: ["CMD", "mysqladmin" ,"ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
+
+  mysql-enrollment:
+    image: mysql:8.0
+    container_name: mysql-enrollment
+    environment:
+      MYSQL_ROOT_PASSWORD: password
+      MYSQL_DATABASE: enrollment_db
+    ports:
+      - "3308:3306"
+    volumes:
+      - mysql_enrollment_data:/var/lib/mysql
+      - ./mysql/init-enrollment.sql:/docker-entrypoint-initdb.d/init-enrollment.sql:ro
+    networks:
+      - microservice-network
+    healthcheck:
+      test: ["CMD", "mysqladmin" ,"ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
+
+  catalog-service:
+    build: ./catalog-service
+    container_name: catalog-service
+    ports:
+      - "8081:8081"
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      DB_URL: jdbc:mysql://mysql-catalog:3306/catalog_db?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+      DB_USERNAME: root
+      DB_PASSWORD: password
+    depends_on:
+      mysql-catalog:
+        condition: service_healthy
+    networks:
+      - microservice-network
+
+  enrollment-service:
+    build: ./enrollment-service
+    container_name: enrollment-service
+    ports:
+      - "8082:8082"
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql-enrollment:3306/enrollment_db?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+      CATALOG_SERVICE_URL: http://catalog-service:8081
+    depends_on:
+      mysql-enrollment:
+        condition: service_healthy
+      catalog-service:
+        condition: service_started
+    networks:
+      - microservice-network
+
+networks:
+  microservice-network:
+    driver: bridge
+
+volumes:
+  mysql_catalog_data:
+  mysql_enrollment_data:
