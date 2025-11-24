@@ -4,6 +4,7 @@ import com.zjgsu.szw.enrollment.common.ApiResponse;
 import com.zjgsu.szw.enrollment.model.Enrollment;
 import com.zjgsu.szw.enrollment.service.EnrollmentService;
 import org.springframework.beans.factory.annotation.Value;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -54,6 +55,8 @@ public class EnrollmentController {
         response.put("timestamp", String.valueOf(System.currentTimeMillis()));
         return ResponseEntity.ok(ApiResponse.success(response));
     }
+
+
 
     /**
      * 测试端点：测试服务发现和负载均衡

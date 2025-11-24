@@ -3,6 +3,7 @@ package com.zjgsu.szw.catalog.exception;
 import com.zjgsu.szw.catalog.common.ApiResponse;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
@@ -32,6 +33,16 @@ public class GlobalExceptionHandler {
         return ResponseEntity
                 .status(HttpStatus.NOT_FOUND)
                 .body(ApiResponse.notFound("Resource not found: " + ex.getResourcePath()));
+    }
+
+    /**
+     * 处理HTTP方法不支持异常（通常意味着路径存在但方法不对，或路径本身就不存在）
+     */
+    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+    public ResponseEntity<ApiResponse<Void>> handleMethodNotSupported(HttpRequestMethodNotSupportedException ex) {
+        return ResponseEntity
+                .status(HttpStatus.NOT_FOUND)
+                .body(ApiResponse.notFound("Resource not found"));
     }
 
     /**
