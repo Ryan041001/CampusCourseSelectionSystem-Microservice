@@ -201,11 +201,53 @@ docker run -d --name catalog-service-8084 -p 8084:8081 catalog-service
 docker run -d --name catalog-service-8085 -p 8085:8081 catalog-service
 ```
 
+## 实验验证截图
+
+### Nacos 控制台截图要求
+
+1. **服务列表截图**
+   - 访问 http://localhost:8848/nacos (nacos/nacos)
+   - 进入"服务管理" -> "服务列表"
+   - 截图显示 catalog-service 和 enrollment-service 注册状态
+
+2. **负载均衡效果截图**
+   ```bash
+   # 多次请求观察不同端口响应
+   for i in {1..10}; do
+     curl http://localhost:8082/api/enrollments/test
+     echo ""
+   done
+   ```
+   - 截图显示响应中包含不同的端口号和主机名
+
+3. **故障转移效果截图**
+   ```bash
+   # 停止一个实例后测试
+   docker stop $(docker ps --format "{{.Names}}" | grep catalog-service | head -1)
+   curl http://localhost:8082/api/enrollments/test
+   ```
+   - 截图显示停止实例后请求仍然成功
+
+### 完整测试流程
+
+```bash
+# 1. 启动多实例环境
+docker-compose up -d --scale catalog-service=3
+
+# 2. 运行完整测试
+cd scripts
+./nacos-test.sh
+
+# 3. 访问 Nacos 控制台验证
+open http://localhost:8848/nacos
+```
+
 ## 查看文档
 
 - **功能测试文档**: `docs/功能测试文档.md`
 - **项目需求**: `docs/hw06.md`, `docs/hw07.md`
-- **Nacos集成**: `docs/hw07.md`
+- **Nacos集成**: `docs/nacos-integration-summary.md`
+- **架构思考**: `docs/week07-reflection.md`
 
 ## 故障排除
 

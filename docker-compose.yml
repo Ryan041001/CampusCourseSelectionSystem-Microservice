@@ -75,9 +75,8 @@ services:
 
   enrollment-service:
     build: ./enrollment-service
-    container_name: enrollment-service
     ports:
-      - "8086:8082"
+      - "8085-8086:8082"
     environment:
       SPRING_PROFILES_ACTIVE: prod
       SPRING_DATASOURCE_URL: jdbc:mysql://mysql-enrollment:3306/enrollment_db?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
