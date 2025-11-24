@@ -14,6 +14,10 @@ spring:
         ephemeral: true
         heart-beat-interval: 5000
         heart-beat-timeout: 15000
+    loadbalancer:
+      ribbon:
+        enabled: false
+      zone: default
   datasource:
     url: jdbc:mysql://localhost:3306/enrollment_db?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
     username: root

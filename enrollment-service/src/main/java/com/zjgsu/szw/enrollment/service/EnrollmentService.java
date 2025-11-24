@@ -147,36 +147,6 @@ public class EnrollmentService {
         // Use dedicated increment/decrement endpoints to avoid validation issues in CourseService.updateCourse
         String incrementUrl = catalogServiceUrl + "/api/courses/" + courseId + "/increment";
         String decrementUrl = catalogServiceUrl + "/api/courses/" + courseId + "/decrement";
-        // Course entity has 'enrolled' field. We can send a partial update or full update.
-        // The requirement says: updateCourseEnrolledCount(courseId, enrolled + 1);
-        // And implementation: restTemplate.put(url, updateData);
-        // But catalog-service PUT /api/courses/{id} expects a full Course object usually.
-        // However, the requirement code snippet suggests:
-        // Map<String, Object> updateData = Map.of("enrolled", newCount);
-        // restTemplate.put(url, updateData);
-        
-        // Let's check CourseController.updateCourse in catalog-service.
-        // It calls courseService.updateCourse(id, course).
-        // courseService.updateCourse validates the course object.
-        // If we send only { "enrolled": 5 }, validation will fail because code, title etc are required.
-        
-        // So we need to fetch the course first, update enrolled, and then PUT it back.
-        // OR, we can add a specific endpoint for updating enrollment count in catalog-service.
-        // But the requirement says "provide complete course CRUD interface", it doesn't explicitly ask for a patch endpoint.
-        // BUT, the provided snippet in hw06.md uses `restTemplate.put(url, updateData)`.
-        // If I strictly follow the snippet, it might fail if the controller expects a full object.
-        
-        // Let's look at the snippet again:
-        // Map<String, Object> updateData = Map.of("enrolled", newCount);
-        // restTemplate.put(url, updateData);
-        
-        // If I use the snippet, I am sending a Map. The controller expects a Course object.
-        // Jackson will try to convert Map to Course.
-        // If Course has validation annotations or manual validation in Service, it will fail.
-        // CourseService.validateCourse checks for code, title, instructor etc.
-        
-        // So I should probably fetch the course, update the enrolled count, and send the full course back.
-        // This is safer given the existing validation logic.
         
         try {
             // Fetch current enrolled count to decide which operation (increment/decrement) to call

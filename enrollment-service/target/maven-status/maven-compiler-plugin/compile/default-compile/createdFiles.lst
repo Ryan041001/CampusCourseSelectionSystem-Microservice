@@ -6,6 +6,7 @@ com/zjgsu/szw/enrollment/exception/GlobalExceptionHandler.class
 com/zjgsu/szw/enrollment/repository/StudentRepository.class
 com/zjgsu/szw/enrollment/model/EnrollmentStatus.class
 com/zjgsu/szw/enrollment/repository/EnrollmentRepository.class
+com/zjgsu/szw/enrollment/config/RestTemplateConfig.class
 com/zjgsu/szw/enrollment/controller/StudentController.class
 com/zjgsu/szw/enrollment/model/Student.class
 com/zjgsu/szw/enrollment/common/ApiResponse.class
