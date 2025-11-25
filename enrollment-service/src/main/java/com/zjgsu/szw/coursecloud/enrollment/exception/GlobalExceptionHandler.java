@@ -26,6 +26,36 @@ public class GlobalExceptionHandler {
     }
 
     /**
+     * 处理课程未找到异常
+     */
+    @ExceptionHandler(CourseNotFoundException.class)
+    public ResponseEntity<ApiResponse<Void>> handleCourseNotFound(CourseNotFoundException ex) {
+        return ResponseEntity
+                .status(HttpStatus.NOT_FOUND)
+                .body(ApiResponse.notFound(ex.getMessage()));
+    }
+
+    /**
+     * 处理课程不可选异常
+     */
+    @ExceptionHandler(CourseNotAvailableException.class)
+    public ResponseEntity<ApiResponse<Void>> handleCourseNotAvailable(CourseNotAvailableException ex) {
+        return ResponseEntity
+                .status(HttpStatus.BAD_REQUEST)
+                .body(ApiResponse.badRequest(ex.getMessage()));
+    }
+
+    /**
+     * 处理Catalog服务不可用异常
+     */
+    @ExceptionHandler(CatalogServiceUnavailableException.class)
+    public ResponseEntity<ApiResponse<Void>> handleCatalogServiceUnavailable(CatalogServiceUnavailableException ex) {
+        return ResponseEntity
+                .status(HttpStatus.SERVICE_UNAVAILABLE)
+                .body(ApiResponse.error(503, ex.getMessage()));
+    }
+
+    /**
      * 处理Spring MVC的资源未找到异常
      */
     @ExceptionHandler(NoResourceFoundException.class)

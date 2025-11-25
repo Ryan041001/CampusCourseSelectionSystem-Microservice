@@ -1,5 +1,7 @@
 package com.zjgsu.szw.coursecloud.enrollment.controller;
 
+import com.zjgsu.szw.coursecloud.enrollment.client.CatalogClient;
+import com.zjgsu.szw.coursecloud.enrollment.client.dto.ApiResponseWrapper;
 import com.zjgsu.szw.coursecloud.enrollment.common.ApiResponse;
 import com.zjgsu.szw.coursecloud.enrollment.model.Enrollment;
 import com.zjgsu.szw.coursecloud.enrollment.service.EnrollmentService;
@@ -8,7 +10,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.client.RestTemplate;
 
 import java.util.HashMap;
 import java.util.List;
@@ -23,14 +24,14 @@ import java.util.Map;
 public class EnrollmentController {
 
     private final EnrollmentService enrollmentService;
-    private final RestTemplate restTemplate;
+    private final CatalogClient catalogClient;
 
     @Value("${server.port}")
     private String serverPort;
 
-    public EnrollmentController(EnrollmentService enrollmentService, RestTemplate restTemplate) {
+    public EnrollmentController(EnrollmentService enrollmentService, CatalogClient catalogClient) {
         this.enrollmentService = enrollmentService;
-        this.restTemplate = restTemplate;
+        this.catalogClient = catalogClient;
     }
 
     /**
@@ -56,10 +57,8 @@ public class EnrollmentController {
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
-
-
     /**
-     * 测试端点：测试服务发现和负载均衡
+     * 测试端点：测试服务发现和负载均衡（使用OpenFeign）
      * GET /api/enrollments/test
      */
     @GetMapping("/test")
@@ -68,20 +67,73 @@ public class EnrollmentController {
         response.put("service", "enrollment-service");
         response.put("port", serverPort);
         response.put("timestamp", String.valueOf(System.currentTimeMillis()));
-        response.put("message", "Service discovery and load balancing test");
+        response.put("message", "OpenFeign + LoadBalancer test");
         
         try {
-            // 调用catalog-service的端口端点来测试服务发现
-            String catalogServiceUrl = "http://catalog-service/api/courses/port";
-            Map<String, Object> catalogResponse = restTemplate.getForObject(catalogServiceUrl, Map.class);
-            if (catalogResponse != null && catalogResponse.containsKey("data")) {
-                Map<String, Object> catalogData = (Map<String, Object>) catalogResponse.get("data");
+            // 使用OpenFeign调用catalog-service的端口端点来测试服务发现和负载均衡
+            ApiResponseWrapper<Map<String, String>> catalogResponse = catalogClient.getServicePort();
+            if (catalogResponse.isSuccess() && catalogResponse.getData() != null) {
+                Map<String, String> catalogData = catalogResponse.getData();
                 response.put("catalog_port", catalogData.get("port"));
                 response.put("catalog_hostname", catalogData.get("hostname"));
+                response.put("feign_call_status", "SUCCESS");
+            } else {
+                response.put("feign_call_status", "FAILED: " + catalogResponse.getMessage());
             }
         } catch (Exception e) {
-            response.put("catalog_port", "Error: " + e.getMessage());
+            response.put("catalog_port", "Error");
+            response.put("feign_call_status", "ERROR: " + e.getMessage());
         }
+        
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    /**
+     * 测试端点：多次调用测试负载均衡效果
+     * GET /api/enrollments/test/loadbalancer?count=5
+     */
+    @GetMapping("/test/loadbalancer")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> testLoadBalancer(
+            @RequestParam(value = "count", defaultValue = "5") int count) {
+        Map<String, Object> response = new HashMap<>();
+        response.put("service", "enrollment-service");
+        response.put("port", serverPort);
+        response.put("test_description", "多次调用catalog-service测试负载均衡");
+        response.put("call_count", count);
+        
+        Map<String, Integer> portDistribution = new HashMap<>();
+        List<Map<String, String>> callResults = new java.util.ArrayList<>();
+        
+        for (int i = 0; i < count; i++) {
+            Map<String, String> callResult = new HashMap<>();
+            callResult.put("call_number", String.valueOf(i + 1));
+            
+            try {
+                ApiResponseWrapper<Map<String, String>> catalogResponse = catalogClient.getServicePort();
+                if (catalogResponse.isSuccess() && catalogResponse.getData() != null) {
+                    String port = catalogResponse.getData().get("port");
+                    String hostname = catalogResponse.getData().get("hostname");
+                    callResult.put("catalog_port", port);
+                    callResult.put("catalog_hostname", hostname);
+                    callResult.put("status", "SUCCESS");
+                    
+                    // 统计端口分布
+                    portDistribution.merge(port, 1, Integer::sum);
+                } else {
+                    callResult.put("status", "FAILED: " + catalogResponse.getMessage());
+                }
+            } catch (Exception e) {
+                callResult.put("status", "ERROR: " + e.getMessage());
+            }
+            
+            callResults.add(callResult);
+        }
+        
+        response.put("call_results", callResults);
+        response.put("port_distribution", portDistribution);
+        response.put("load_balance_analysis", portDistribution.size() > 1 
+                ? "负载均衡生效！请求被分发到 " + portDistribution.size() + " 个不同的实例" 
+                : "当前只有1个catalog-service实例运行");
         
         return ResponseEntity.ok(ApiResponse.success(response));
     }

@@ -17,6 +17,11 @@ spring:
     loadbalancer:
       ribbon:
         enabled: false
+      # Spring Cloud LoadBalancer配置
+      cache:
+        enabled: true
+        ttl: 35s
+        capacity: 256
   datasource:
     url: jdbc:mysql://localhost:3306/enrollment_db?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
     username: root
@@ -38,3 +43,33 @@ management:
   endpoint:
     health:
       show-details: always
+
+# OpenFeign配置
+feign:
+  client:
+    config:
+      default:
+        # 连接超时时间（毫秒）
+        connectTimeout: 5000
+        # 读取超时时间（毫秒）
+        readTimeout: 5000
+        # 日志级别: NONE, BASIC, HEADERS, FULL
+        loggerLevel: BASIC
+      # 针对catalog-service的特定配置
+      catalog-service:
+        connectTimeout: 5000
+        readTimeout: 10000
+        loggerLevel: FULL
+  # 启用请求和响应压缩
+  compression:
+    request:
+      enabled: true
+      mime-types: text/xml,application/xml,application/json
+      min-request-size: 2048
+    response:
+      enabled: true
+
+# 日志配置 - 打印Feign调用日志
+logging:
+  level:
+    com.zjgsu.szw.coursecloud.enrollment.client: DEBUG

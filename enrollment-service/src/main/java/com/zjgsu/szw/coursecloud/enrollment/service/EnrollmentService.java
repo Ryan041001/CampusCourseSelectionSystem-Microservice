@@ -1,40 +1,45 @@
 package com.zjgsu.szw.coursecloud.enrollment.service;
 
+import com.zjgsu.szw.coursecloud.enrollment.client.CatalogClient;
+import com.zjgsu.szw.coursecloud.enrollment.client.dto.ApiResponseWrapper;
+import com.zjgsu.szw.coursecloud.enrollment.client.dto.CourseDTO;
+import com.zjgsu.szw.coursecloud.enrollment.exception.CatalogServiceUnavailableException;
+import com.zjgsu.szw.coursecloud.enrollment.exception.CourseNotAvailableException;
+import com.zjgsu.szw.coursecloud.enrollment.exception.CourseNotFoundException;
 import com.zjgsu.szw.coursecloud.enrollment.exception.ResourceNotFoundException;
 import com.zjgsu.szw.coursecloud.enrollment.model.Enrollment;
 import com.zjgsu.szw.coursecloud.enrollment.model.EnrollmentStatus;
-import com.zjgsu.szw.coursecloud.enrollment.model.Student;
 import com.zjgsu.szw.coursecloud.enrollment.repository.EnrollmentRepository;
 import com.zjgsu.szw.coursecloud.enrollment.repository.StudentRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.client.HttpClientErrorException;
-import org.springframework.web.client.RestTemplate;
 
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
 /**
  * 选课业务逻辑层
+ * 使用OpenFeign + Spring Cloud LoadBalancer实现服务间通信与负载均衡
  */
 @Service
 public class EnrollmentService {
+
+    private static final Logger logger = LoggerFactory.getLogger(EnrollmentService.class);
+
     private final EnrollmentRepository enrollmentRepository;
     private final StudentRepository studentRepository;
-    private final RestTemplate restTemplate;
-
-    // Use service name instead of hardcoded URL for Nacos service discovery
-    private final String catalogServiceUrl = "http://catalog-service";
+    private final CatalogClient catalogClient;
 
     public EnrollmentService(EnrollmentRepository enrollmentRepository,
                              StudentRepository studentRepository,
-                             RestTemplate restTemplate) {
+                             CatalogClient catalogClient) {
         this.enrollmentRepository = enrollmentRepository;
         this.studentRepository = studentRepository;
-        this.restTemplate = restTemplate;
+        this.catalogClient = catalogClient;
     }
 
     /**
@@ -67,52 +72,48 @@ public class EnrollmentService {
 
     /**
      * 学生选课
+     * 使用OpenFeign调用catalog-service进行课程验证
      */
     @Transactional
     public Enrollment createEnrollment(Enrollment enrollment) {
         String courseId = enrollment.getCourseId();
         String studentId = enrollment.getStudentId();
 
+        logger.info("开始选课流程 - 学生: {}, 课程: {}", studentId, courseId);
+
         // 1. 验证学生是否存在
         if (!studentRepository.existsByStudentId(studentId)) {
+            logger.warn("学生不存在: {}", studentId);
             throw new ResourceNotFoundException("Student not found with studentId: " + studentId);
         }
 
-        // 2. 调用课程目录服务验证课程是否存在
-        String url = catalogServiceUrl + "/api/courses/" + courseId;
-        Map<String, Object> courseResponse;
-        try {
-            courseResponse = restTemplate.getForObject(url, Map.class);
-        } catch (HttpClientErrorException.NotFound e) {
-            throw new ResourceNotFoundException("Course", courseId);
+        // 2. 使用Feign Client调用catalog-service获取课程信息
+        CourseDTO course = getCourseFromCatalogService(courseId);
+        logger.info("成功获取课程信息: {} - {}", course.getCode(), course.getTitle());
+
+        // 3. 检查课程是否可选（有剩余容量）
+        if (!course.isAvailable()) {
+            logger.warn("课程已满: {} (容量: {}, 已选: {})", courseId, course.getCapacity(), course.getEnrolled());
+            throw new CourseNotAvailableException(courseId, course.getCapacity(), course.getEnrolled());
         }
 
-        // 3. 从响应中提取课程信息
-        if (courseResponse == null || !courseResponse.containsKey("data")) {
-             throw new RuntimeException("Invalid response from catalog service");
-        }
-        Map<String, Object> courseData = (Map<String, Object>) courseResponse.get("data");
-        Integer capacity = (Integer) courseData.get("capacity");
-        Integer enrolled = (Integer) courseData.get("enrolled");
-
-        // 4. 检查课程容量
-        if (enrolled >= capacity) {
-            throw new IllegalArgumentException("Course is full");
-        }
-
-        // 5. 检查重复选课
+        // 4. 检查是否重复选课
         if (enrollmentRepository.existsByCourseIdAndStudentId(courseId, studentId)) {
+            logger.warn("重复选课: 学生 {} 已选择课程 {}", studentId, courseId);
             throw new IllegalArgumentException("Already enrolled in this course");
         }
 
-        // 6. 创建选课记录
+        // 5. 创建选课记录
         enrollment.setId(UUID.randomUUID().toString());
         enrollment.setStatus(EnrollmentStatus.ACTIVE);
         enrollment.setEnrolledAt(LocalDateTime.now());
         Enrollment saved = enrollmentRepository.save(enrollment);
+        logger.info("选课记录已创建: {}", saved.getId());
 
-        // 7. 更新课程的已选人数 (调用 catalog-service)
-        updateCourseEnrolledCount(courseId, enrolled + 1);
+        // 6. 使用Feign Client更新课程的已选人数
+        incrementCourseEnrolledCount(courseId);
+
+        logger.info("选课成功 - 学生: {}, 课程: {}, 选课记录: {}", studentId, courseId, saved.getId());
         return saved;
     }
 
@@ -121,52 +122,95 @@ public class EnrollmentService {
      */
     @Transactional
     public void deleteEnrollment(String id) {
+        logger.info("开始退课流程 - 选课记录ID: {}", id);
+
         Enrollment enrollment = enrollmentRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Enrollment not found with id: " + id));
 
+        String courseId = enrollment.getCourseId();
+
         // 删除选课记录
         enrollmentRepository.deleteById(id);
+        logger.info("选课记录已删除: {}", id);
 
-        // 获取当前课程信息以更新人数
-        String url = catalogServiceUrl + "/api/courses/" + enrollment.getCourseId();
+        // 使用Feign Client更新课程选课人数
+        decrementCourseEnrolledCount(courseId);
+
+        logger.info("退课成功 - 课程: {}", courseId);
+    }
+
+    /**
+     * 从catalog-service获取课程信息
+     * 使用OpenFeign声明式调用，通过Spring Cloud LoadBalancer实现负载均衡
+     */
+    private CourseDTO getCourseFromCatalogService(String courseId) {
+        logger.debug("调用catalog-service获取课程信息: {}", courseId);
+        
         try {
-            Map<String, Object> courseResponse = restTemplate.getForObject(url, Map.class);
-            if (courseResponse != null && courseResponse.containsKey("data")) {
-                Map<String, Object> courseData = (Map<String, Object>) courseResponse.get("data");
-                Integer enrolled = (Integer) courseData.get("enrolled");
-                // 更新课程选课人数
-                updateCourseEnrolledCount(enrollment.getCourseId(), enrolled - 1);
+            ApiResponseWrapper<CourseDTO> response = catalogClient.getCourseById(courseId);
+            
+            // 检查服务是否可用
+            if (response.getCode() == 503) {
+                logger.error("Catalog服务不可用: {}", response.getMessage());
+                throw new CatalogServiceUnavailableException(response.getMessage());
             }
+            
+            // 检查课程是否存在
+            if (response.getCode() == 404 || response.getData() == null) {
+                logger.warn("课程不存在: {}", courseId);
+                throw new CourseNotFoundException(courseId);
+            }
+            
+            // 检查响应是否成功
+            if (!response.isSuccess()) {
+                logger.error("获取课程信息失败: {}", response.getMessage());
+                throw new RuntimeException("Failed to get course from catalog service: " + response.getMessage());
+            }
+            
+            logger.debug("成功从catalog-service获取课程: {}", response.getData());
+            return response.getData();
+            
+        } catch (CourseNotFoundException | CatalogServiceUnavailableException e) {
+            throw e;
         } catch (Exception e) {
-             // 记录日志但不影响主流程
-             System.err.println("Failed to update course enrolled count during deletion: " + e.getMessage());
+            logger.error("调用catalog-service异常: {}", e.getMessage(), e);
+            throw new CatalogServiceUnavailableException("调用课程服务失败: " + e.getMessage(), e);
         }
     }
 
-    private void updateCourseEnrolledCount(String courseId, int newCount) {
-        // Use dedicated increment/decrement endpoints to avoid validation issues in CourseService.updateCourse
-        String incrementUrl = catalogServiceUrl + "/api/courses/" + courseId + "/increment";
-        String decrementUrl = catalogServiceUrl + "/api/courses/" + courseId + "/decrement";
-        
+    /**
+     * 增加课程选课人数
+     */
+    private void incrementCourseEnrolledCount(String courseId) {
+        logger.debug("调用catalog-service增加选课人数: {}", courseId);
         try {
-            // Fetch current enrolled count to decide which operation (increment/decrement) to call
-            Map<String, Object> courseResponse = restTemplate.getForObject(catalogServiceUrl + "/api/courses/" + courseId, Map.class);
-            if (courseResponse != null && courseResponse.containsKey("data")) {
-                Map<String, Object> data = (Map<String, Object>) courseResponse.get("data");
-                Integer enrolled = (Integer) data.get("enrolled");
-                if (enrolled == null) enrolled = 0;
-                if (newCount == enrolled + 1) {
-                    restTemplate.postForEntity(incrementUrl, null, Void.class);
-                } else if (newCount == enrolled - 1) {
-                    restTemplate.postForEntity(decrementUrl, null, Void.class);
-                } else {
-                    // Fallback: if newCount differs by more than 1, attempt to set via update full course
-                    data.put("enrolled", newCount);
-                    restTemplate.put(catalogServiceUrl + "/api/courses/" + courseId, data);
-                }
+            ApiResponseWrapper<Void> response = catalogClient.incrementEnrolled(courseId);
+            if (response.isSuccess()) {
+                logger.info("成功更新课程选课人数(+1): {}", courseId);
+            } else {
+                logger.warn("更新课程选课人数失败: {} - {}", courseId, response.getMessage());
             }
         } catch (Exception e) {
-            System.err.println("Failed to update course enrolled count: " + e.getMessage());
+            // 记录日志但不影响主流程（选课记录已创建）
+            logger.error("更新课程选课人数异常: {} - {}", courseId, e.getMessage());
+        }
+    }
+
+    /**
+     * 减少课程选课人数
+     */
+    private void decrementCourseEnrolledCount(String courseId) {
+        logger.debug("调用catalog-service减少选课人数: {}", courseId);
+        try {
+            ApiResponseWrapper<Void> response = catalogClient.decrementEnrolled(courseId);
+            if (response.isSuccess()) {
+                logger.info("成功更新课程选课人数(-1): {}", courseId);
+            } else {
+                logger.warn("更新课程选课人数失败: {} - {}", courseId, response.getMessage());
+            }
+        } catch (Exception e) {
+            // 记录日志但不影响主流程（退课记录已删除）
+            logger.error("更新课程选课人数异常: {} - {}", courseId, e.getMessage());
         }
     }
 }

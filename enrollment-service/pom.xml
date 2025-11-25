@@ -78,6 +78,13 @@
 			<artifactId>spring-cloud-starter-loadbalancer</artifactId>
 			<version>4.2.0</version>
 		</dependency>
+
+		<!-- OpenFeign for declarative service calls -->
+		<dependency>
+			<groupId>org.springframework.cloud</groupId>
+			<artifactId>spring-cloud-starter-openfeign</artifactId>
+			<version>4.2.0</version>
+		</dependency>
 	</dependencies>
 
 	<build>
