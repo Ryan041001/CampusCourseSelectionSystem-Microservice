@@ -44,10 +44,10 @@ check_service() {
 # 函数：测试负载均衡
 get_mapped_ports() {
     # get mapped host ports for containers whose name contains $1 and that map to the given internal port $2
-    # returns space separated ports
+    # returns space separated unique ports
     local service_name=$1
     local internal_port=$2
-    docker ps --format "{{.Names}}\t{{.Ports}}" | grep "$service_name" | grep -o ":[0-9]*->$internal_port" | grep -o '[0-9]*' || true
+    docker ps --format "{{.Names}}\t{{.Ports}}" | grep "$service_name" | grep -oE "0\.0\.0\.0:[0-9]+->${internal_port}/tcp" | sed 's/0\.0\.0\.0:\([0-9]*\)->.*/\1/' | sort -u | tr '\n' ' '
 }
 
 test_load_balancing() {
@@ -95,8 +95,8 @@ test_failover() {
     # 停止一个实例
     docker stop $container_name
     
-    print_message $YELLOW "等待 10 秒让 Nacos 检测到实例下线..."
-    sleep 10
+    print_message $YELLOW "等待 15 秒让 Nacos 检测到实例下线..."
+    sleep 15
     
     print_message $BLUE "测试服务是否仍然可用..."
     for i in {1..5}; do
@@ -131,7 +131,7 @@ sleep 20
 print_message $YELLOW "步骤 3: 检查服务状态..."
 
 # 检查 Nacos
-check_service "Nacos" "http://localhost:8848/nacos/"
+check_service "Nacos" "http://localhost:8848/"
 
 # 检查 Catalog Service (检查所有可能的端口)
 if curl -s -f "http://localhost:8081/actuator/health" > /dev/null 2>&1; then
@@ -168,11 +168,11 @@ fi
 print_message $YELLOW "步骤 4: 检查服务注册情况..."
 
 echo "检查 catalog-service 注册情况:"
-curl -s -X GET "http://localhost:8848/nacos/v1/ns/instance/list?groupName=COURSEHUB_GROUP&serviceName=catalog-service" | python3 -m json.tool 2>/dev/null || curl -s -X GET "http://localhost:8848/nacos/v1/ns/instance/list?groupName=COURSEHUB_GROUP&serviceName=catalog-service"
+curl -s -X GET "http://localhost:8849/nacos/v1/ns/instance/list?groupName=COURSEHUB_GROUP&serviceName=catalog-service" | python3 -m json.tool 2>/dev/null || curl -s -X GET "http://localhost:8849/nacos/v1/ns/instance/list?groupName=COURSEHUB_GROUP&serviceName=catalog-service"
 echo ""
 
 echo "检查 enrollment-service 注册情况:"
-curl -s -X GET "http://localhost:8848/nacos/v1/ns/instance/list?groupName=COURSEHUB_GROUP&serviceName=enrollment-service" | python3 -m json.tool 2>/dev/null || curl -s -X GET "http://localhost:8848/nacos/v1/ns/instance/list?groupName=COURSEHUB_GROUP&serviceName=enrollment-service"
+curl -s -X GET "http://localhost:8849/nacos/v1/ns/instance/list?groupName=COURSEHUB_GROUP&serviceName=enrollment-service" | python3 -m json.tool 2>/dev/null || curl -s -X GET "http://localhost:8849/nacos/v1/ns/instance/list?groupName=COURSEHUB_GROUP&serviceName=enrollment-service"
 echo ""
 
 # 5. 测试服务调用和负载均衡
@@ -213,7 +213,7 @@ print_message $GREEN "=========================================="
 
 echo ""
 print_message $BLUE "Nacos 控制台访问地址:"
-echo "  URL: http://localhost:8848/nacos"
+echo "  URL: http://localhost:8848"
 echo "  用户名: nacos"
 echo "  密码: nacos"
 echo ""

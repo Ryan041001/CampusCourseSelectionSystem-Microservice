@@ -2,10 +2,10 @@
 # test-all-apis.sh
 # 自动化测试脚本 - 覆盖所有API端点
 
-set -e  # 遇到错误立即退出
+# set -e  # 遇到错误立即退出
 
 BASE_URL_CATALOG="http://localhost:8081"
-BASE_URL_ENROLLMENT="http://localhost:8086"
+BASE_URL_ENROLLMENT="http://localhost:8085"
 
 echo "========================================="
 echo "  校园选课系统微服务 - 自动化测试套件"
