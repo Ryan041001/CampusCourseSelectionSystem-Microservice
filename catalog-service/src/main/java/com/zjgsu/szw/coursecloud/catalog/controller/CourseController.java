@@ -75,7 +75,7 @@ public class CourseController {
      * 根据ID查询课程
      * GET /api/courses/{id}
      */
-    @GetMapping("/{id:[a-fA-F0-9\\-]+}")
+    @GetMapping("/{id:[a-zA-Z0-9\\-]+}")
     public ResponseEntity<ApiResponse<Course>> getCourseById(@PathVariable String id) {
         Course course = courseService.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Course not found with id: " + id));

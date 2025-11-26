@@ -1,0 +1,101 @@
+# ========================
+# Maven
+# ========================
+**/target/
+!.mvn/wrapper/maven-wrapper.jar
+
+# ========================
+# IDE - IntelliJ IDEA
+# ========================
+.idea/
+*.iws
+*.iml
+*.ipr
+out/
+!**/src/main/**/out/
+!**/src/test/**/out/
+
+# ========================
+# IDE - Eclipse
+# ========================
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings/
+.springBeans
+.sts4-cache
+bin/
+!**/src/main/**/bin/
+!**/src/test/**/bin/
+
+# ========================
+# IDE - VS Code
+# ========================
+.vscode/
+
+# ========================
+# Java
+# ========================
+*.class
+*.jar
+*.war
+*.ear
+*.nar
+hs_err_pid*
+replay_pid*
+
+# ========================
+# Spring Boot
+# ========================
+*.log
+logs/
+spring-boot-*.log
+
+# ========================
+# OS Generated
+# ========================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# ========================
+# Docker
+# ========================
+# Docker data volumes (if mounted locally)
+mysql-data/
+nacos-data/
+
+# ========================
+# Environment & Secrets
+# ========================
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+application-local.yml
+application-secret.yml
+
+# ========================
+# Test & Coverage
+# ========================
+coverage/
+*.lcov
+.nyc_output/
+test-results/
+surefire-reports/
+
+# ========================
+# Misc
+# ========================
+*.swp
+*.swo
+*~
+.cache/
+tmp/
+temp/

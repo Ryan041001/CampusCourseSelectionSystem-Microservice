@@ -1,10 +1,40 @@
-# hw08 实现说明：服务间通信与负载均衡
+# hw08: 服务间通信与负载均衡
 
+**作业编号**：hw08
 **实现状态**：✅ 已完成
 
-## 实现概述
+## 版本信息
 
-本文档记录了 hw08 作业的实现细节，在 Nacos 注册中心基础上，使用 OpenFeign 实现声明式服务调用，使用 Spring Cloud LoadBalancer 实现客户端负载均衡。
+- **项目名称：** course-cloud
+- **版本号：** v1.2.0（引入服务间通信与负载均衡）
+- **基于版本：** v1.1.0
+
+---
+
+## 系统架构说明
+
+系统架构演进为：
+
+`Enrollment Service` → `OpenFeign + Spring Cloud LoadBalancer` → `Catalog Service`
+
+Enrollment Service 需要调用 Catalog Service 验证课程信息，通过 OpenFeign 实现声明式服务调用，通过 Spring Cloud LoadBalancer 实现客户端负载均衡。
+
+---
+
+## 核心任务
+
+- 在 Enrollment Service 中集成 OpenFeign
+- 创建 Feign Client 接口调用 Catalog Service
+- 配置 LoadBalancer 负载均衡策略
+- 实现选课时的课程信息验证
+- 启动多个 Catalog Service 实例验证负载均衡
+- 完成后打 tag：`v1.2.0`
+
+---
+
+## 实现详情
+
+本文档记录了 hw08 作业的实现细节。
 
 ---
 
@@ -103,7 +133,7 @@ spring:
   cloud:
     loadbalancer:
       ribbon:
-        enabled: false  # 禁用Ribbon，使用Spring Cloud LoadBalancer
+        enabled: false # 禁用Ribbon，使用Spring Cloud LoadBalancer
       cache:
         enabled: true
         ttl: 35s
@@ -144,12 +174,15 @@ logging:
 ## 7. DTO 类 ✅
 
 ### CourseDTO.java
+
 用于接收 catalog-service 的课程响应。
 
 ### ApiResponseWrapper.java
+
 用于解析 catalog-service 的统一响应格式。
 
 ### InstructorDTO.java / ScheduleSlotDTO.java
+
 辅助 DTO 类。
 
 ---
@@ -176,16 +209,16 @@ public class EnrollmentService {
         // 1. 验证学生是否存在
         // 2. 使用Feign Client调用catalog-service获取课程信息
         CourseDTO course = getCourseFromCatalogService(courseId);
-        
+
         // 3. 检查课程是否可选
         if (!course.isAvailable()) {
             throw new CourseNotAvailableException(...);
         }
-        
+
         // 4. 创建选课记录
         // 5. 使用Feign Client更新课程选课人数
         incrementCourseEnrolledCount(courseId);
-        
+
         return saved;
     }
 }
@@ -193,16 +226,86 @@ public class EnrollmentService {
 
 ---
 
-## 10. 测试端点 ✅
+## 10. 测试验证 ✅
 
-### 服务发现测试
+### 10.1 自动化测试脚本
+
+创建了 `scripts/test-feign-loadbalancer.sh` 测试脚本，用于验证 OpenFeign 和 LoadBalancer 功能：
+
 ```bash
-curl http://localhost:8082/api/enrollments/test
+./scripts/test-feign-loadbalancer.sh
 ```
 
-### 负载均衡测试
+### 10.2 测试结果截图
+
+![负载均衡测试结果](images/test-feign-loadbalancer.png)
+
+### 10.3 测试项目说明
+
+| 测试项   | 描述                                   | 结果 |
+| -------- | -------------------------------------- | :--: |
+| 前置检查 | 验证 Catalog/Enrollment Service 可用性 |  ✅  |
+| 测试 1   | Catalog Service 基础功能               |  ✅  |
+| 测试 2   | Enrollment Service 基础功能            |  ✅  |
+| 测试 3   | OpenFeign 服务间调用                   |  ✅  |
+| 测试 4   | Spring Cloud LoadBalancer 负载均衡     |  ✅  |
+| 测试 5   | 选课功能（Feign 验证课程）             |  ✅  |
+| 测试 6   | 服务降级（Fallback）                   |  ✅  |
+
+### 10.4 关键测试结果
+
+#### OpenFeign 服务间调用
+
+```json
+{
+  "code": 200,
+  "message": "Success",
+  "data": {
+    "catalog_port": "8081",
+    "port": "8082",
+    "service": "enrollment-service",
+    "catalog_hostname": "7a7e2c763067",
+    "message": "Service discovery and load balancing test",
+    "timestamp": "1764083263459"
+  },
+  "timestamp": "2025-11-25T15:07:43.841166654"
+}
+```
+
+**说明**：Enrollment Service (8082) 成功通过 OpenFeign 调用了 Catalog Service (8081)。
+
+#### 负载均衡测试（10 次调用）
+
+```
+调用 #1: Catalog 端口=8081, 主机=58ceeffc9927
+调用 #2: Catalog 端口=8081, 主机=3d7503a9dc57
+调用 #3: Catalog 端口=8081, 主机=7a7e2c763067
+调用 #4: Catalog 端口=8081, 主机=58ceeffc9927
+调用 #5: Catalog 端口=8081, 主机=3d7503a9dc57
+调用 #6: Catalog 端口=8081, 主机=7a7e2c763067
+调用 #7: Catalog 端口=8081, 主机=58ceeffc9927
+调用 #8: Catalog 端口=8081, 主机=3d7503a9dc57
+调用 #9: Catalog 端口=8081, 主机=7a7e2c763067
+调用 #10: Catalog 端口=8081, 主机=58ceeffc9927
+```
+
+**主机分布统计**：
+| 容器 ID | 调用次数 |
+|--------|:-------:|
+| 3d7503a9dc57 | 3 次 |
+| 58ceeffc9927 | 4 次 |
+| 7a7e2c763067 | 3 次 |
+
+**结论**：✅ **负载均衡生效！** 请求被 **轮询（Round-Robin）** 分发到 3 个不同的 catalog-service 容器实例。
+
+### 10.5 手动测试命令
+
 ```bash
-curl "http://localhost:8082/api/enrollments/test/loadbalancer?count=10"
+# 服务发现测试
+curl http://localhost:8085/api/enrollments/test
+
+# 负载均衡测试（多次调用）
+curl "http://localhost:8085/api/enrollments/test/loadbalancer?count=10"
 ```
 
 ---
@@ -232,6 +335,8 @@ enrollment-service/
 
 ---
 
+---
+
 ## 完成情况
 
 - [x] OpenFeign 依赖与配置
@@ -241,4 +346,22 @@ enrollment-service/
 - [x] 自定义异常处理
 - [x] EnrollmentService 重构
 - [x] 测试端点
+- [x] 自动化测试脚本
 - [x] 文档
+
+---
+
+## 测试总结
+
+```
+============================================================
+测试总结
+============================================================
+总测试项: 11
+通过: 11
+失败: 0
+
+========================================
+       所有测试通过！ 🎉
+========================================
+```
