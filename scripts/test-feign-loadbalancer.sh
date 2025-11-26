@@ -13,11 +13,24 @@ BLUE='\033[0;34m'
 CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
-# 服务地址配置（根据 docker-compose 端口映射）
-# Catalog Service: 8081, 8082, 8083 (3个实例)
-# Enrollment Service: 8085
-CATALOG_SERVICE="http://localhost:8081"
-ENROLLMENT_SERVICE="http://localhost:8085"
+# 动态获取服务端口的函数
+get_service_port() {
+    local service=$1
+    local internal_port=$2
+    local default_port=$3
+    local port=$(docker compose ps --format "table {{.Names}}\t{{.Ports}}" 2>/dev/null | \
+        grep "$service" | \
+        grep -oE "0\.0\.0\.0:[0-9]+->${internal_port}/tcp" | \
+        head -1 | \
+        sed 's/0\.0\.0\.0:\([0-9]*\)->.*/\1/')
+    echo "${port:-$default_port}"
+}
+
+# 服务地址配置（动态检测端口）
+CATALOG_PORT=$(get_service_port "catalog-service" "8081" "8081")
+ENROLLMENT_PORT=$(get_service_port "enrollment-service" "8082" "8085")
+CATALOG_SERVICE="http://localhost:$CATALOG_PORT"
+ENROLLMENT_SERVICE="http://localhost:$ENROLLMENT_PORT"
 
 # 计数器
 PASS_COUNT=0
@@ -433,8 +446,8 @@ show_help() {
     echo "  -l, --lb       仅测试负载均衡"
     echo ""
     echo "环境变量:"
-    echo "  CATALOG_URL    Catalog Service 地址 (默认: http://localhost:8081)"
-    echo "  ENROLLMENT_URL Enrollment Service 地址 (默认: http://localhost:8082)"
+    echo "  CATALOG_URL    Catalog Service 地址 (默认: http://localhost:8082)"
+    echo "  ENROLLMENT_URL Enrollment Service 地址 (默认: http://localhost:8085)"
     echo ""
     echo "示例:"
     echo "  $0              # 运行所有测试"

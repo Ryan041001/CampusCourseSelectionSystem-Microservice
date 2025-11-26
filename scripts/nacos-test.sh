@@ -130,12 +130,12 @@ sleep 20
 # 3. 检查各个服务状态
 print_message $YELLOW "步骤 3: 检查服务状态..."
 
-# 检查 Nacos
-check_service "Nacos" "http://localhost:8848/"
+# 检查 Nacos (API 端口 8848)
+check_service "Nacos" "http://localhost:8848/nacos/"
 
-# 检查 Catalog Service (检查所有可能的端口)
-if curl -s -f "http://localhost:8081/actuator/health" > /dev/null 2>&1; then
-    check_service "Catalog Service" "http://localhost:8081/actuator/health"
+# 检查 Catalog Service (检查所有可能的端口: 8082, 8083 等)
+if curl -s -f "http://localhost:8082/actuator/health" > /dev/null 2>&1; then
+    check_service "Catalog Service" "http://localhost:8082/actuator/health"
 elif curl -s -f "http://localhost:8083/actuator/health" > /dev/null 2>&1; then
     check_service "Catalog Service" "http://localhost:8083/actuator/health"
 else
@@ -149,9 +149,9 @@ else
     fi
 fi
 
-# 检查 Enrollment Service
-if curl -s -f "http://localhost:8082/actuator/health" > /dev/null 2>&1; then
-    check_service "Enrollment Service" "http://localhost:8082/actuator/health"
+# 检查 Enrollment Service (端口 8085 优先)
+if curl -s -f "http://localhost:8085/actuator/health" > /dev/null 2>&1; then
+    check_service "Enrollment Service" "http://localhost:8085/actuator/health"
 elif curl -s -f "http://localhost:8086/actuator/health" > /dev/null 2>&1; then
     check_service "Enrollment Service" "http://localhost:8086/actuator/health"
 else
@@ -168,11 +168,11 @@ fi
 print_message $YELLOW "步骤 4: 检查服务注册情况..."
 
 echo "检查 catalog-service 注册情况:"
-curl -s -X GET "http://localhost:8849/nacos/v1/ns/instance/list?groupName=COURSEHUB_GROUP&serviceName=catalog-service" | python3 -m json.tool 2>/dev/null || curl -s -X GET "http://localhost:8849/nacos/v1/ns/instance/list?groupName=COURSEHUB_GROUP&serviceName=catalog-service"
+curl -s -X GET "http://localhost:8848/nacos/v1/ns/instance/list?groupName=COURSEHUB_GROUP&serviceName=catalog-service" | python3 -m json.tool 2>/dev/null || curl -s -X GET "http://localhost:8848/nacos/v1/ns/instance/list?groupName=COURSEHUB_GROUP&serviceName=catalog-service"
 echo ""
 
 echo "检查 enrollment-service 注册情况:"
-curl -s -X GET "http://localhost:8849/nacos/v1/ns/instance/list?groupName=COURSEHUB_GROUP&serviceName=enrollment-service" | python3 -m json.tool 2>/dev/null || curl -s -X GET "http://localhost:8849/nacos/v1/ns/instance/list?groupName=COURSEHUB_GROUP&serviceName=enrollment-service"
+curl -s -X GET "http://localhost:8848/nacos/v1/ns/instance/list?groupName=COURSEHUB_GROUP&serviceName=enrollment-service" | python3 -m json.tool 2>/dev/null || curl -s -X GET "http://localhost:8848/nacos/v1/ns/instance/list?groupName=COURSEHUB_GROUP&serviceName=enrollment-service"
 echo ""
 
 # 5. 测试服务调用和负载均衡
@@ -181,7 +181,7 @@ print_message $YELLOW "步骤 5: 测试服务调用和负载均衡..."
 # 动态获取enrollment-service的端口
 enrollment_port=$(docker ps --format "table {{.Names}}\t{{.Ports}}" | grep enrollment-service | grep -o ':[0-9]*->8082' | grep -o '[0-9]*' | head -1)
 if [ -z "$enrollment_port" ]; then
-    enrollment_port="8086"  # 默认端口
+    enrollment_port="8085"  # 默认端口 (docker-compose 映射 8085-8086:8082)
 fi
 
 echo "测试 enrollment-service 通过服务名调用 catalog-service:"
@@ -226,7 +226,7 @@ enrollment_detected_ports=$(get_mapped_ports "enrollment-service" 8082 | tr '\n'
 if [ -n "$catalog_detected_ports" ]; then
     echo "  Catalog Service (mapped host ports): $catalog_detected_ports"
 else
-    echo "  Catalog Service: http://localhost:8081 (默认)"
+    echo "  Catalog Service: http://localhost:8082 (默认)"
 fi
 
 if [ -n "$enrollment_detected_ports" ]; then
@@ -242,7 +242,7 @@ if [ -n "$catalog_detected_ports" ]; then
         echo "  Catalog Service 端口: http://localhost:$p/api/courses/port"
     done
 else
-    echo "  Catalog Service 端口: http://localhost:8081/api/courses/port"
+    echo "  Catalog Service 端口: http://localhost:8082/api/courses/port"
 fi
 
 if [ -n "$enrollment_detected_ports" ]; then
@@ -253,8 +253,8 @@ if [ -n "$enrollment_detected_ports" ]; then
     first_enrollment_port=$(echo $enrollment_detected_ports | awk '{print $1}')
     echo "  负载均衡测试: http://localhost:$first_enrollment_port/api/enrollments/test (首选映射端口)"
 else
-    echo "  Enrollment Service 端口: http://localhost:8082/api/enrollments/port"
-    echo "  负载均衡测试: http://localhost:8082/api/enrollments/test"
+    echo "  Enrollment Service 端口: http://localhost:8085/api/enrollments/port"
+    echo "  负载均衡测试: http://localhost:8085/api/enrollments/test"
 fi
 echo ""
 

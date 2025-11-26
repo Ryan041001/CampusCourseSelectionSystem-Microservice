@@ -173,9 +173,20 @@ public class EnrollmentController {
     /**
      * 学生选课
      * POST /api/enrollments
+     * 支持从Gateway传递的请求头读取用户信息
      */
     @PostMapping
-    public ResponseEntity<ApiResponse<Enrollment>> createEnrollment(@RequestBody Enrollment enrollment) {
+    public ResponseEntity<ApiResponse<Enrollment>> createEnrollment(
+            @RequestHeader(value = "X-User-Id", required = false) String userId,
+            @RequestHeader(value = "X-Username", required = false) String username,
+            @RequestHeader(value = "X-User-Role", required = false) String userRole,
+            @RequestBody Enrollment enrollment) {
+        
+        // 如果请求头中有用户信息，且enrollment中没有设置studentId，则使用请求头中的用户ID
+        if (userId != null && (enrollment.getStudentId() == null || enrollment.getStudentId().isEmpty())) {
+            enrollment.setStudentId(userId);
+        }
+        
         Enrollment created = enrollmentService.createEnrollment(enrollment);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.created(created));
