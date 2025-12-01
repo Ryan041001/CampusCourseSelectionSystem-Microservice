@@ -255,10 +255,10 @@ gateway-service:
 
 ```bash
 # 构建并启动所有服务
-docker-compose up --build -d
+docker compose up --build -d
 
 # 查看日志
-docker-compose logs -f gateway-service
+docker compose logs -f gateway-service
 ```
 
 ---
