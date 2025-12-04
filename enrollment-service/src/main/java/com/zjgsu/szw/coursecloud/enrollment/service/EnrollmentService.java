@@ -3,14 +3,16 @@ package com.zjgsu.szw.coursecloud.enrollment.service;
 import com.zjgsu.szw.coursecloud.enrollment.client.CatalogClient;
 import com.zjgsu.szw.coursecloud.enrollment.client.dto.ApiResponseWrapper;
 import com.zjgsu.szw.coursecloud.enrollment.client.dto.CourseDTO;
+import com.zjgsu.szw.coursecloud.enrollment.client.UserClient;
+import com.zjgsu.szw.coursecloud.enrollment.client.dto.UserDTO;
 import com.zjgsu.szw.coursecloud.enrollment.exception.CatalogServiceUnavailableException;
 import com.zjgsu.szw.coursecloud.enrollment.exception.CourseNotAvailableException;
 import com.zjgsu.szw.coursecloud.enrollment.exception.CourseNotFoundException;
 import com.zjgsu.szw.coursecloud.enrollment.exception.ResourceNotFoundException;
+import com.zjgsu.szw.coursecloud.enrollment.exception.UserServiceUnavailableException;
 import com.zjgsu.szw.coursecloud.enrollment.model.Enrollment;
 import com.zjgsu.szw.coursecloud.enrollment.model.EnrollmentStatus;
 import com.zjgsu.szw.coursecloud.enrollment.repository.EnrollmentRepository;
-import com.zjgsu.szw.coursecloud.enrollment.repository.StudentRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -31,15 +33,15 @@ public class EnrollmentService {
     private static final Logger logger = LoggerFactory.getLogger(EnrollmentService.class);
 
     private final EnrollmentRepository enrollmentRepository;
-    private final StudentRepository studentRepository;
     private final CatalogClient catalogClient;
+    private final UserClient userClient;
 
     public EnrollmentService(EnrollmentRepository enrollmentRepository,
-                             StudentRepository studentRepository,
-                             CatalogClient catalogClient) {
+                             CatalogClient catalogClient,
+                             UserClient userClient) {
         this.enrollmentRepository = enrollmentRepository;
-        this.studentRepository = studentRepository;
         this.catalogClient = catalogClient;
+        this.userClient = userClient;
     }
 
     /**
@@ -82,10 +84,8 @@ public class EnrollmentService {
         logger.info("开始选课流程 - 学生: {}, 课程: {}", studentId, courseId);
 
         // 1. 验证学生是否存在
-        if (!studentRepository.existsByStudentId(studentId)) {
-            logger.warn("学生不存在: {}", studentId);
-            throw new ResourceNotFoundException("Student not found with studentId: " + studentId);
-        }
+        UserDTO user = getUserFromUserService(studentId);
+        logger.info("成功获取学生信息: {} - {}", user.getStudentId(), user.getName());
 
         // 2. 使用Feign Client调用catalog-service获取课程信息
         CourseDTO course = getCourseFromCatalogService(courseId);
@@ -115,6 +115,27 @@ public class EnrollmentService {
 
         logger.info("选课成功 - 学生: {}, 课程: {}, 选课记录: {}", studentId, courseId, saved.getId());
         return saved;
+    }
+
+    private UserDTO getUserFromUserService(String studentId) {
+        logger.debug("调用user-service校验学生: {}", studentId);
+        try {
+            ApiResponseWrapper<UserDTO> response = userClient.getUserByStudentId(studentId);
+            if (response.getCode() == 503) {
+                throw new UserServiceUnavailableException(response.getMessage());
+            }
+            if (response.getCode() == 404 || response.getData() == null) {
+                throw new ResourceNotFoundException("Student not found with studentId: " + studentId);
+            }
+            if (!response.isSuccess()) {
+                throw new RuntimeException("Failed to get user from user-service: " + response.getMessage());
+            }
+            return response.getData();
+        } catch (ResourceNotFoundException | UserServiceUnavailableException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new UserServiceUnavailableException("调用用户服务失败: " + e.getMessage(), e);
+        }
     }
 
     /**

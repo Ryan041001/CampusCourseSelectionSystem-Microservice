@@ -20,8 +20,10 @@ get_service_port() {
 # 服务端口配置 (动态检测)
 CATALOG_PORT=$(get_service_port "catalog-service" "8081" "8081")
 ENROLLMENT_PORT=$(get_service_port "enrollment-service" "8082" "8085")
+USER_PORT=$(get_service_port "user-service" "8080" "8079")
 BASE_URL_CATALOG="http://localhost:$CATALOG_PORT"
 BASE_URL_ENROLLMENT="http://localhost:$ENROLLMENT_PORT"
+BASE_URL_USER="http://localhost:$USER_PORT"
 
 echo "========================================="
 echo "  校园选课系统微服务 - 自动化测试套件"
@@ -53,7 +55,100 @@ print_request() {
 }
 
 echo "═══════════════════════════════════════"
-echo "第一部分: Catalog Service API 测试"
+echo "第一部分: User Service API 测试"
+echo "═══════════════════════════════════════"
+echo ""
+
+TEST_STUDENT_ID="STU$(date +%s)"
+
+# TC-US-001: 创建学生
+echo ">>> TC-US-001: 创建学生"
+REQUEST_DATA=$(cat <<EOF
+{
+  "studentId": "$TEST_STUDENT_ID",
+  "name": "张三",
+  "major": "计算机科学与技术",
+  "grade": 2024,
+  "email": "zhangsan+$TEST_STUDENT_ID@zjgsu.edu.cn"
+}
+EOF
+)
+print_request "POST" "$BASE_URL_USER/api/users" "$REQUEST_DATA"
+RESPONSE=$(curl -s -w "\n%{http_code}" -X POST $BASE_URL_USER/api/users \
+-H "Content-Type: application/json" \
+-d "$REQUEST_DATA")
+HTTP_CODE=$(echo "$RESPONSE" | tail -n 1)
+RESPONSE_BODY=$(echo "$RESPONSE" | sed '$d')
+
+if [ "$HTTP_CODE" == "201" ]; then
+    echo -e "${GREEN}✓ TC-US-001 PASSED (HTTP: $HTTP_CODE)${NC}"
+    PASSED=$((PASSED+1))
+    USER_ID=$(echo "$RESPONSE_BODY" | jq -r '.data.id')
+    USER_STUDENT_ID=$(echo "$RESPONSE_BODY" | jq -r '.data.studentId')
+else
+    echo -e "${RED}✗ TC-US-001 FAILED (HTTP: $HTTP_CODE)${NC}"
+    FAILED=$((FAILED+1))
+    echo "$RESPONSE_BODY"
+    exit 1
+fi
+echo ""
+
+# TC-US-002: 查询所有学生
+echo ">>> TC-US-002: 查询所有学生"
+print_request "GET" "$BASE_URL_USER/api/users"
+RESPONSE=$(curl -s -w "\n%{http_code}" $BASE_URL_USER/api/users)
+HTTP_CODE=$(echo "$RESPONSE" | tail -n 1)
+if [ "$HTTP_CODE" == "200" ]; then
+    echo -e "${GREEN}✓ TC-US-002 PASSED (HTTP: $HTTP_CODE)${NC}"
+    PASSED=$((PASSED+1))
+else
+    echo -e "${RED}✗ TC-US-002 FAILED (HTTP: $HTTP_CODE)${NC}"
+    FAILED=$((FAILED+1))
+fi
+echo ""
+
+# TC-US-003: 根据学号查询
+echo ">>> TC-US-003: 根据学号查询学生"
+print_request "GET" "$BASE_URL_USER/api/users/student/$USER_STUDENT_ID"
+RESPONSE=$(curl -s -w "\n%{http_code}" $BASE_URL_USER/api/users/student/$USER_STUDENT_ID)
+HTTP_CODE=$(echo "$RESPONSE" | tail -n 1)
+if [ "$HTTP_CODE" == "200" ]; then
+    echo -e "${GREEN}✓ TC-US-003 PASSED (HTTP: $HTTP_CODE)${NC}"
+    PASSED=$((PASSED+1))
+else
+    echo -e "${RED}✗ TC-US-003 FAILED (HTTP: $HTTP_CODE)${NC}"
+    FAILED=$((FAILED+1))
+fi
+echo ""
+
+# TC-US-004: 更新学生
+echo ">>> TC-US-004: 更新学生信息"
+REQUEST_DATA=$(cat <<EOF
+{
+  "studentId": "$USER_STUDENT_ID",
+  "name": "张三",
+  "major": "软件工程",
+  "grade": 2025,
+  "email": "zhangsan+$USER_STUDENT_ID@zjgsu.edu.cn"
+}
+EOF
+)
+print_request "PUT" "$BASE_URL_USER/api/users/$USER_ID" "$REQUEST_DATA"
+RESPONSE=$(curl -s -w "\n%{http_code}" -X PUT $BASE_URL_USER/api/users/$USER_ID \
+-H "Content-Type: application/json" \
+-d "$REQUEST_DATA")
+HTTP_CODE=$(echo "$RESPONSE" | tail -n 1)
+if [ "$HTTP_CODE" == "200" ]; then
+    echo -e "${GREEN}✓ TC-US-004 PASSED (HTTP: $HTTP_CODE)${NC}"
+    PASSED=$((PASSED+1))
+else
+    echo -e "${RED}✗ TC-US-004 FAILED (HTTP: $HTTP_CODE)${NC}"
+    FAILED=$((FAILED+1))
+fi
+echo ""
+
+echo "═══════════════════════════════════════"
+echo "第二部分: Catalog Service API 测试"
 echo "═══════════════════════════════════════"
 echo ""
 
@@ -224,104 +319,13 @@ fi
 echo ""
 
 echo "═══════════════════════════════════════"
-echo "第二部分: Enrollment Service - 学生管理测试"
-echo "═══════════════════════════════════════"
-echo ""
-
-# TC-ES-001: 创建学生
-echo ">>> TC-ES-001: 创建学生"
-REQUEST_DATA='{
-  "studentId": "2024001",
-  "name": "张三",
-  "major": "计算机科学与技术",
-  "grade": 2024,
-  "email": "zhangsan@zjgsu.edu.cn"
-}'
-print_request "POST" "$BASE_URL_ENROLLMENT/api/students" "$REQUEST_DATA"
-RESPONSE=$(curl -s -w "\n%{http_code}" -X POST $BASE_URL_ENROLLMENT/api/students \
--H "Content-Type: application/json" \
--d "$REQUEST_DATA")
-HTTP_CODE=$(echo "$RESPONSE" | tail -n 1)
-RESPONSE_BODY=$(echo "$RESPONSE" | sed '$d')
-
-if [ "$HTTP_CODE" == "201" ]; then
-    echo -e "${GREEN}✓ TC-ES-001 PASSED (HTTP: $HTTP_CODE)${NC}"
-    PASSED=$((PASSED+1))
-    echo -e "${GREEN}[响应]${NC}"
-    echo "$RESPONSE_BODY" | jq '.'
-else
-    echo -e "${RED}✗ TC-ES-001 FAILED (HTTP: $HTTP_CODE)${NC}"
-    FAILED=$((FAILED+1))
-    echo "$RESPONSE_BODY"
-fi
-echo ""
-
-# TC-ES-002: 获取所有学生
-echo ">>> TC-ES-002: 获取所有学生"
-print_request "GET" "$BASE_URL_ENROLLMENT/api/students"
-RESPONSE=$(curl -s -w "\n%{http_code}" $BASE_URL_ENROLLMENT/api/students)
-HTTP_CODE=$(echo "$RESPONSE" | tail -n 1)
-RESPONSE_BODY=$(echo "$RESPONSE" | sed '$d')
-
-if [ "$HTTP_CODE" == "200" ]; then
-    echo -e "${GREEN}✓ TC-ES-002 PASSED (HTTP: $HTTP_CODE)${NC}"
-    PASSED=$((PASSED+1))
-    # 保存学生ID供后续测试使用
-    STUDENT_UUID=$(echo "$RESPONSE_BODY" | jq -r '.data[0].id')
-    echo "学生数量: $(echo "$RESPONSE_BODY" | jq '.data | length')"
-else
-    echo -e "${RED}✗ TC-ES-002 FAILED (HTTP: $HTTP_CODE)${NC}"
-    FAILED=$((FAILED+1))
-fi
-echo ""
-
-# TC-ES-003: 根据ID查询学生
-echo ">>> TC-ES-003: 根据ID查询学生"
-print_request "GET" "$BASE_URL_ENROLLMENT/api/students/$STUDENT_UUID"
-RESPONSE=$(curl -s -w "\n%{http_code}" $BASE_URL_ENROLLMENT/api/students/$STUDENT_UUID)
-HTTP_CODE=$(echo "$RESPONSE" | tail -n 1)
-
-if [ "$HTTP_CODE" == "200" ]; then
-    echo -e "${GREEN}✓ TC-ES-003 PASSED (HTTP: $HTTP_CODE)${NC}"
-    PASSED=$((PASSED+1))
-else
-    echo -e "${RED}✗ TC-ES-003 FAILED (HTTP: $HTTP_CODE)${NC}"
-    FAILED=$((FAILED+1))
-fi
-echo ""
-
-# TC-ES-004: 更新学生信息
-echo ">>> TC-ES-004: 更新学生信息"
-REQUEST_DATA='{
-  "studentId": "2024001",
-  "name": "张三",
-  "major": "软件工程",
-  "grade": 2024,
-  "email": "zhangsan@zjgsu.edu.cn"
-}'
-print_request "PUT" "$BASE_URL_ENROLLMENT/api/students/$STUDENT_UUID" "$REQUEST_DATA"
-RESPONSE=$(curl -s -w "\n%{http_code}" -X PUT $BASE_URL_ENROLLMENT/api/students/$STUDENT_UUID \
--H "Content-Type: application/json" \
--d "$REQUEST_DATA")
-HTTP_CODE=$(echo "$RESPONSE" | tail -n 1)
-
-if [ "$HTTP_CODE" == "200" ]; then
-    echo -e "${GREEN}✓ TC-ES-004 PASSED (HTTP: $HTTP_CODE)${NC}"
-    PASSED=$((PASSED+1))
-else
-    echo -e "${RED}✗ TC-ES-004 FAILED (HTTP: $HTTP_CODE)${NC}"
-    FAILED=$((FAILED+1))
-fi
-echo ""
-
-echo "═══════════════════════════════════════"
 echo "第三部分: Enrollment Service - 选课管理测试"
 echo "═══════════════════════════════════════"
 echo ""
 
 # TC-ES-006: 学生选课 (服务间通信测试)
 echo ">>> TC-ES-006: 学生选课 (验证服务间通信)"
-REQUEST_DATA="{\"courseId\": \"$COURSE_ID\", \"studentId\": \"2024001\"}"
+REQUEST_DATA="{\"courseId\": \"$COURSE_ID\", \"studentId\": \"$USER_STUDENT_ID\"}"
 print_request "POST" "$BASE_URL_ENROLLMENT/api/enrollments" "$REQUEST_DATA"
 RESPONSE=$(curl -s -w "\n%{http_code}" -X POST $BASE_URL_ENROLLMENT/api/enrollments \
 -H "Content-Type: application/json" \
@@ -376,8 +380,8 @@ echo ""
 
 # TC-ES-009: 按学生查询选课记录
 echo ">>> TC-ES-009: 按学生查询选课记录"
-print_request "GET" "$BASE_URL_ENROLLMENT/api/enrollments/student/2024001"
-RESPONSE=$(curl -s -w "\n%{http_code}" $BASE_URL_ENROLLMENT/api/enrollments/student/2024001)
+print_request "GET" "$BASE_URL_ENROLLMENT/api/enrollments/student/$USER_STUDENT_ID"
+RESPONSE=$(curl -s -w "\n%{http_code}" $BASE_URL_ENROLLMENT/api/enrollments/student/$USER_STUDENT_ID)
 HTTP_CODE=$(echo "$RESPONSE" | tail -n 1)
 
 if [ "$HTTP_CODE" == "200" ]; then
@@ -393,7 +397,7 @@ echo ""
 echo ">>> TC-ES-012: 选课时课程不存在(异常场景 - 服务间错误处理)"
 REQUEST_DATA='{
   "courseId": "non-existent-course-id",
-  "studentId": "2024001"
+  "studentId": "non-existent-student"
 }'
 print_request "POST" "$BASE_URL_ENROLLMENT/api/enrollments" "$REQUEST_DATA"
 RESPONSE=$(curl -s -w "\n%{http_code}" -X POST $BASE_URL_ENROLLMENT/api/enrollments \
@@ -441,17 +445,16 @@ else
 fi
 echo ""
 
-# TC-ES-005: 删除学生
-echo ">>> TC-ES-005: 删除学生"
-print_request "DELETE" "$BASE_URL_ENROLLMENT/api/students/$STUDENT_UUID"
-RESPONSE=$(curl -s -w "\n%{http_code}" -X DELETE $BASE_URL_ENROLLMENT/api/students/$STUDENT_UUID)
+# TC-US-005: 删除学生（软删除）
+echo ">>> TC-US-005: 删除学生"
+print_request "DELETE" "$BASE_URL_USER/api/users/$USER_ID"
+RESPONSE=$(curl -s -w "\n%{http_code}" -X DELETE $BASE_URL_USER/api/users/$USER_ID)
 HTTP_CODE=$(echo "$RESPONSE" | tail -n 1)
-
 if [ "$HTTP_CODE" == "200" ]; then
-    echo -e "${GREEN}✓ TC-ES-005 PASSED (HTTP: $HTTP_CODE)${NC}"
+    echo -e "${GREEN}✓ TC-US-005 PASSED (HTTP: $HTTP_CODE)${NC}"
     PASSED=$((PASSED+1))
 else
-    echo -e "${RED}✗ TC-ES-005 FAILED (HTTP: $HTTP_CODE)${NC}"
+    echo -e "${RED}✗ TC-US-005 FAILED (HTTP: $HTTP_CODE)${NC}"
     FAILED=$((FAILED+1))
 fi
 echo ""

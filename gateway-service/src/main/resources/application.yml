@@ -49,6 +49,14 @@ spring:
           filters:
             - StripPrefix=0
 
+        # User Service 路由
+        - id: user-service
+          uri: lb://user-service
+          predicates:
+            - Path=/api/users/**
+          filters:
+            - StripPrefix=0
+
 # JWT 配置
 jwt:
   secret: YourSuperSecretKeyForJWTHS512AlgorithmMustBeLongEnoughAtLeast512Bits

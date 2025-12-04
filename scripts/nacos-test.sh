@@ -164,6 +164,19 @@ else
     fi
 fi
 
+# 检查 User Service (端口 8080 优先)
+if curl -s -f "http://localhost:8080/actuator/health" > /dev/null 2>&1; then
+    check_service "User Service" "http://localhost:8080/actuator/health"
+else
+    print_message $YELLOW "User Service 可能在其他端口启动..."
+    user_ports=$(docker ps --format "table {{.Names}}\t{{.Ports}}" | grep user-service | grep -o ':[0-9]*->8080' | grep -o '[0-9]*' | head -1)
+    if [ ! -z "$user_ports" ]; then
+        check_service "User Service" "http://localhost:$user_ports/actuator/health"
+    else
+        print_message $RED "✗ 无法找到可用的 User Service 端口"
+    fi
+fi
+
 # 4. 检查服务注册情况
 print_message $YELLOW "步骤 4: 检查服务注册情况..."
 
@@ -173,6 +186,10 @@ echo ""
 
 echo "检查 enrollment-service 注册情况:"
 curl -s -X GET "http://localhost:8848/nacos/v1/ns/instance/list?groupName=COURSEHUB_GROUP&serviceName=enrollment-service" | python3 -m json.tool 2>/dev/null || curl -s -X GET "http://localhost:8848/nacos/v1/ns/instance/list?groupName=COURSEHUB_GROUP&serviceName=enrollment-service"
+echo ""
+
+echo "检查 user-service 注册情况:"
+curl -s -X GET "http://localhost:8848/nacos/v1/ns/instance/list?groupName=COURSEHUB_GROUP&serviceName=user-service" | python3 -m json.tool 2>/dev/null || curl -s -X GET "http://localhost:8848/nacos/v1/ns/instance/list?groupName=COURSEHUB_GROUP&serviceName=user-service"
 echo ""
 
 # 5. 测试服务调用和负载均衡
@@ -219,9 +236,10 @@ echo "  密码: nacos"
 echo ""
 
 print_message $BLUE "服务访问地址 (检测到的 host 映射端口):"
-# 尝试检测 catalog 和 enrollment 的映射端口
+# 尝试检测 catalog、enrollment 和 user 的映射端口
 catalog_detected_ports=$(get_mapped_ports "catalog-service" 8081 | tr '\n' ' ')
 enrollment_detected_ports=$(get_mapped_ports "enrollment-service" 8082 | tr '\n' ' ')
+user_detected_ports=$(get_mapped_ports "user-service" 8080 | tr '\n' ' ')
 
 if [ -n "$catalog_detected_ports" ]; then
     echo "  Catalog Service (mapped host ports): $catalog_detected_ports"
@@ -255,6 +273,14 @@ if [ -n "$enrollment_detected_ports" ]; then
 else
     echo "  Enrollment Service 端口: http://localhost:8085/api/enrollments/port"
     echo "  负载均衡测试: http://localhost:8085/api/enrollments/test"
+fi
+
+if [ -n "$user_detected_ports" ]; then
+    for p in $user_detected_ports; do
+        echo "  User Service 端口: http://localhost:$p/api/users/port"
+    done
+else
+    echo "  User Service 端口: http://localhost:8080/api/users/port"
 fi
 echo ""
 

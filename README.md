@@ -145,6 +145,7 @@ docker start catalog-service
 |--------|------|------|----------|
 | Catalog Service | 8081 | 课程管理服务 | http://localhost:8081/actuator/health |
 | Enrollment Service | 8082 | 学生选课服务 | http://localhost:8082/actuator/health |
+| User Service | 8080 | 学生基础信息服务 | http://localhost:8080/actuator/health |
 
 ### 基础设施
 
@@ -153,8 +154,18 @@ docker start catalog-service
 | Nacos | 8848 | 服务注册与发现 | http://localhost:8848/nacos |
 | MySQL Catalog | 3307 | 课程数据库 | - |
 | MySQL Enrollment | 3308 | 选课数据库 | - |
+| MySQL User | 3309 | 用户数据库 | - |
 
 ### API端点
+
+#### User Service
+- `GET /api/users` - 查询所有学生
+- `GET /api/users/{idOrStudentId}` - 根据UUID或学号查询学生
+- `GET /api/users/student/{studentId}` - 按学号查询学生
+- `POST /api/users` - 创建学生（软删除字段默认false）
+- `PUT /api/users/{idOrStudentId}` - 更新学生信息
+- `DELETE /api/users/{idOrStudentId}` - 软删除学生
+- `GET /api/users/port` - 获取服务端口（测试）
 
 #### Catalog Service
 - `GET /api/courses` - 查询所有课程

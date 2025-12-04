@@ -56,6 +56,16 @@ public class GlobalExceptionHandler {
     }
 
     /**
+     * 处理User服务不可用异常
+     */
+    @ExceptionHandler(UserServiceUnavailableException.class)
+    public ResponseEntity<ApiResponse<Void>> handleUserServiceUnavailable(UserServiceUnavailableException ex) {
+        return ResponseEntity
+                .status(HttpStatus.SERVICE_UNAVAILABLE)
+                .body(ApiResponse.error(503, ex.getMessage()));
+    }
+
+    /**
      * 处理Spring MVC的资源未找到异常
      */
     @ExceptionHandler(NoResourceFoundException.class)

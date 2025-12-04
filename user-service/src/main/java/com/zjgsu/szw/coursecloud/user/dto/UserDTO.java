@@ -1,66 +1,37 @@
-package com.zjgsu.szw.coursecloud.enrollment.model;
+package com.zjgsu.szw.coursecloud.user.dto;
 
-import jakarta.persistence.*;
 import java.time.LocalDateTime;
-import java.util.UUID;
 
 /**
- * 学生实体类
+ * User Data Transfer Object
+ * Used for external service communication to avoid exposing internal entity structure
  */
-@Entity
-@Table(name = "students", indexes = {
-        @Index(name = "idx_student_id", columnList = "student_id"),
-        @Index(name = "idx_email", columnList = "email")
-})
-public class Student {
-    @Id
-    @Column(length = 36)
+public class UserDTO {
+    
     private String id;
-
-    @Column(name = "student_id", nullable = false, unique = true, length = 50)
     private String studentId;
-
-    @Column(nullable = false, length = 100)
     private String name;
-
-    @Column(length = 100)
     private String major;
-
-    @Column
     private Integer grade;
-
-    @Column(unique = true, length = 100)
     private String email;
-
-    @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
 
-    public Student() {
-        this.id = UUID.randomUUID().toString();
-        this.createdAt = LocalDateTime.now();
+    public UserDTO() {
     }
 
-    public Student(String studentId, String name, String major, Integer grade, String email) {
-        this.id = UUID.randomUUID().toString();
+    public UserDTO(String id, String studentId, String name, String major, Integer grade, String email, 
+                   LocalDateTime createdAt, LocalDateTime updatedAt) {
+        this.id = id;
         this.studentId = studentId;
         this.name = name;
         this.major = major;
         this.grade = grade;
         this.email = email;
-        this.createdAt = LocalDateTime.now();
+        this.createdAt = createdAt;
+        this.updatedAt = updatedAt;
     }
 
-    @PrePersist
-    protected void onCreate() {
-        if (createdAt == null) {
-            createdAt = LocalDateTime.now();
-        }
-        if (id == null || id.isEmpty()) {
-            id = UUID.randomUUID().toString();
-        }
-    }
-
-    // Getters and Setters
     public String getId() {
         return id;
     }
@@ -115,5 +86,13 @@ public class Student {
 
     public void setCreatedAt(LocalDateTime createdAt) {
         this.createdAt = createdAt;
+    }
+
+    public LocalDateTime getUpdatedAt() {
+        return updatedAt;
+    }
+
+    public void setUpdatedAt(LocalDateTime updatedAt) {
+        this.updatedAt = updatedAt;
     }
 }
